@@ -6,11 +6,20 @@ from auth import gerar_token, token_obrigatorio
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
-import json
+import json 
+from flasgger import Swagger
 
 load_dotenv()
 
 app = Flask(__name__)
+
+# Versão do OPEN API
+app.config['SWAGGER'] = {
+    'openapi': '3.0.0'
+}
+
+#Chamar o OpenAPI para o código
+swagger = Swagger(app, template_file='openapi.yaml')
 
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY") 
 

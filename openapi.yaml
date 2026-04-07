@@ -1,0 +1,231 @@
+openapi: 3.0.0
+info:
+  title: API de Charadas (Riddles API)
+  description: >
+    API desenvolvida em Flask para gerenciamento de charadas com persistência no Firebase Firestore. 
+    Inclui autenticação JWT para operações de escrita e busca pública de charadas. 
+  version: 1.0.0
+  contact:
+    name: Isabelly
+    email: isabelly.ferreira.senai@gmail.com 
+
+servers:
+  - url: http://localhost:5000
+    description: Servidor de Desenvolvimento Local
+  - url: https://seu-projeto.vercel.app
+    description: Servidor de Produção (Vercel)
+
+tags:
+  - name: Autenticação
+    description: Acesso e geração de tokens
+  - name: Charadas Públicas
+    description: Consultas abertas a todos os usuários
+  - name: Charadas Privadas
+    description: Operações administrativas (Requer Token)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Charada:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Identificador único gerado pelo contador do Firestore
+          example: 42
+        pergunta:
+          type: string
+          description: O texto da charada
+          example: "O que é que quanto mais se tira, maior fica?"
+        resposta:
+          type: string
+          description: A solução da charada
+          example: "O buraco"
+
+    Erro:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Mensagem detalhada do erro"
+
+paths:
+  /:
+    get:
+      tags: [Charadas Públicas]
+      summary: Informações da API
+      description: Retorna o status, versão e autor da API.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api: { type: string, example: "charadas" }
+                  version: { type: string, example: "1.0" }
+                  Author: { type: string, example: "Isabelly" }
+
+  /login:
+    post:
+      tags: [Autenticação]
+      summary: Realizar login administrativo
+      description: Gera um token JWT se as credenciais coincidirem com as variáveis de ambiente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [usuario, senha]
+              properties:
+                usuario: { type: string, example: "admin" }
+                senha: { type: string, example: "123456" }
+      responses:
+        '200':
+          description: Login bem-sucedido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: "Login realizado com sucesso" }
+                  token: { type: string }
+        '400':
+          description: Dados insuficientes
+        '401':
+          description: Usuário ou senha inválidos
+
+  /charadas:
+    get:
+      tags: [Charadas Públicas]
+      summary: Listar todas as charadas
+      responses:
+        '200':
+          description: Uma lista de objetos de charada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Charada'
+    
+    post:
+      tags: [Charadas Privadas]
+      summary: Cadastrar nova charada
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pergunta, resposta]
+              properties:
+                pergunta: { type: string }
+                resposta: { type: string }
+      responses:
+        '201':
+          description: Charada criada e ID incrementado
+        '400':
+          description: Erro na validação ou falha no Firestore
+        '401':
+          description: Token não fornecido ou inválido
+
+  /charadas/aleatoria:
+    get:
+      tags: [Charadas Públicas]
+      summary: Obter charada aleatória
+      responses:
+        '200':
+          description: Uma única charada escolhida ao acaso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Charada'
+
+  /charadas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: ID numérico da charada
+        schema:
+          type: integer
+    
+    get:
+      tags: [Charadas Públicas]
+      summary: Buscar charada por ID
+      responses:
+        '200':
+          description: Charada encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Charada'
+        '404':
+          description: Charada não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+
+    put:
+      tags: [Charadas Privadas]
+      summary: Substituir charada existente
+      description: Atualiza todos os campos de uma charada específica.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pergunta, resposta]
+              properties:
+                pergunta: { type: string }
+                resposta: { type: string }
+      responses:
+        '200':
+          description: Charada atualizada com sucesso
+        '404':
+          description: ID não encontrado
+
+    patch:
+      tags: [Charadas Privadas]
+      summary: Atualização parcial
+      description: Permite enviar apenas a pergunta ou apenas a resposta.
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pergunta: { type: string }
+                resposta: { type: string }
+      responses:
+        '200':
+          description: Campo(s) atualizado(s)
+        '400':
+          description: Nenhum dado enviado para alteração
+
+    delete:
+      tags: [Charadas Privadas]
+      summary: Remover charada
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Charada removida do Firestore
+        '404':
+          description: ID não encontrado
